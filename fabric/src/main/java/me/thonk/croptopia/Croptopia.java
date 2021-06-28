@@ -128,17 +128,14 @@ public class Croptopia implements ModInitializer {
             cropItems.add(item);
         }
 
-        if (item instanceof SeedItem) {
+        if (item instanceof SeedItem seedItem) {
             CroptopiaCropBlock block = (CroptopiaCropBlock) ((SeedItem) item).getBlock();
-            block.setSeedsItem(item);
+            block.setSeedsItem(seedItem);
             //runner.getTagger().addSeedTag(item, Croptopia.createIdentifier(itemName));
         }
 
         // \bregisterItem\b..[A-Z]\w+",
         //System.out.println( "\"" + itemName + "\",");
-        if (item instanceof SeedItem) {
-            seeds.add(new ConfigurableSeed(itemName, item, ((SeedItem) item).getCategory(), 0.0125f));
-        }
 
         // data generation
         //runner.getTagger().addTag(item, Croptopia.createIdentifier(itemName));
