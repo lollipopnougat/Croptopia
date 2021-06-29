@@ -2,7 +2,10 @@ package me.thonk.croptopia.events;
 
 import me.thonk.croptopia.CroptopiaForge;
 import me.thonk.croptopia.items.SeedItem;
+import me.thonk.croptopia.registry.BlockRegistry;
+import me.thonk.croptopia.registry.ItemRegistry;
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.item.ItemStack;
 import net.minecraft.loot.LootContext;
@@ -20,6 +23,15 @@ import java.util.Random;
 public class BlockBreakEvent {
 
     private static final Random random = new Random();
+
+
+    @SubscribeEvent
+    public void onInteractionWithTool(BlockEvent.BlockToolInteractEvent event) {
+        BlockState state = event.getState();
+        if (state.getBlock().matchesBlock(BlockRegistry.cinnamonLog)) {
+            Block.spawnAsEntity(event.getPlayer().getEntityWorld(), event.getPos(), new ItemStack(ItemRegistry.cinnamon));
+        }
+    }
 
     @SubscribeEvent
     public void onBlockBreak(BlockEvent.BreakEvent event) {
