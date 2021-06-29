@@ -17,6 +17,7 @@ import net.minecraft.world.IBlockReader;
 import net.minecraft.world.IWorld;
 import net.minecraft.world.IWorldReader;
 import net.minecraft.world.server.ServerWorld;
+import net.minecraftforge.common.ForgeHooks;
 
 import java.util.Random;
 
@@ -75,11 +76,22 @@ public class LeafCropBlock extends CroptopiaCropBlock {
 
     @Override
     public boolean ticksRandomly(BlockState state) {
-        return state.get(DISTANCE) == 7;
+        return true;
     }
 
     @Override
     public void randomTick(BlockState state, ServerWorld world, BlockPos pos, Random random) {
+        if (!world.isAreaLoaded(pos, 1)) return; // Forge: prevent loading unloaded chunks when checking neighbor's light
+        if (world.getLightSubtracted(pos, 0) >= 9) {
+            int i = this.getAge(state);
+            if (i < this.getMaxAge()) {
+                if (ForgeHooks.onCropsGrowPre(world, pos, state, random.nextInt(100) % 20 == 0)) {
+                    world.setBlockState(pos, this.withAge(i + 1), 2);
+                    ForgeHooks.onCropsGrowPost(world, pos, state);
+                }
+            }
+        }
+
         if (state.get(DISTANCE) == 7) {
             spawnDrops(state, world, pos);
             world.removeBlock(pos, false);
