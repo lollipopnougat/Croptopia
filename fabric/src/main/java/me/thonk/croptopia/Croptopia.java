@@ -1,12 +1,17 @@
 package me.thonk.croptopia;
 
+import ca.stellardrift.confabricate.typeserializers.MinecraftSerializers;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import it.unimi.dsi.fastutil.ints.IntList;
 import me.thonk.common.MiscNames;
 import me.thonk.croptopia.blocks.CroptopiaCropBlock;
 import me.thonk.croptopia.blocks.LeafCropBlock;
 import me.thonk.croptopia.config.ConfigurableSeed;
+import me.thonk.croptopia.config.CroptopiaConfig;
+import me.thonk.croptopia.config.TreeConfiguration;
 import me.thonk.croptopia.dependencies.Patchouli;
 import me.thonk.croptopia.generator.BiomeModifiers;
 import me.thonk.croptopia.items.CropLootTableModifier;
@@ -15,6 +20,7 @@ import me.thonk.croptopia.items.SeedItem;
 import me.thonk.croptopia.loottables.BiomeLootCondition;
 import me.thonk.croptopia.mixin.AxeAccess;
 import me.thonk.croptopia.mixin.ChickenAccess;
+import me.thonk.croptopia.mixin.FarmerWorkTaskAccessor;
 import me.thonk.croptopia.mixin.ParrotAccess;
 import me.thonk.croptopia.mixin.VillagerAccess;
 import me.thonk.croptopia.registry.BlockRegistry;
@@ -30,6 +36,7 @@ import net.fabricmc.fabric.api.resource.ResourcePackActivationType;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.*;
 import net.minecraft.entity.EntityType;
+import net.minecraft.entity.ai.brain.task.FarmerWorkTask;
 import net.minecraft.item.*;
 import net.minecraft.loot.condition.LootCondition;
 import net.minecraft.loot.condition.LootConditionType;
@@ -42,6 +49,7 @@ import net.minecraft.util.JsonSerializer;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.registry.Registry;
 import net.minecraft.world.BlockView;
+import org.spongepowered.configurate.serialize.SerializationException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,16 +57,19 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static me.thonk.croptopia.Constants.OPTIONS;
 
 
 public class Croptopia implements ModInitializer {
+
+    private final boolean devEnvironment = Boolean.getBoolean("croptopia.dev");
 
     public static ArrayList<Block> cropBlocks = new ArrayList<>();
     public static ArrayList<Item> cropItems = new ArrayList<>();
     public static ArrayList<Block> leafBlocks = new ArrayList<>();
     private static List<ConfigurableSeed> seeds = new ArrayList<>();
 
+
+    public CroptopiaConfig config;
 
     public static final ItemGroup CROPTOPIA_ITEM_GROUP = FabricItemGroupBuilder.create(new Identifier(MiscNames.MOD_ID, "croptopia"))
             .icon(() -> new ItemStack(ItemRegistry.onion))
@@ -78,26 +89,34 @@ public class Croptopia implements ModInitializer {
         LeavesRegistry.init();
         BlockRegistry.init();
         ItemRegistry.init();
+        Composter.init();
 
-        OPTIONS.addSeedDefaults(seeds, OPTIONS.getOptionsFile());
-        seeds.clear();
-        seeds = OPTIONS.readConfiguredSeeds(OPTIONS.getOptionsFile());
+        this.config = new CroptopiaConfig(devEnvironment, "croptopia.conf");
+        config.addSerializer(ConfigurableSeed.class, ConfigurableSeed.Serializer.INSTANCE);
+        config.addSerializer(TreeConfiguration.class, TreeConfiguration.Serializer.INSTANCE);
+        config.addSerializer(MinecraftSerializers.collection());
+        config.loadConfig();
+        try {
+            seeds = config.getRootNode().node("configuredSeeds").getList(ConfigurableSeed.class);
+        } catch (SerializationException e) {
+            e.printStackTrace();
+        }
 
-        BiomeModifiers.init();
+        BiomeModifiers.init(this);
         CropLootTableModifier.init();
 
-        Composter.init();
         CommandRegistrationCallback.EVENT.register((commandDispatcher, b) -> {
             SetupCommand.register(commandDispatcher);
         });
 
-        CroptopiaVillagerTrades.init();
+        //CroptopiaVillagerTrades.init();
 
         modifyVillagerFoodItems();
         modifyVillagerGatherables();
         modifyAxeBlockStripping();
         modifyChickenBreeds();
         modifyParrotBreeds();
+        modifyVillagerFarmerTaskCompostables();
     }
 
     public static Identifier createIdentifier(String name) {
@@ -131,6 +150,9 @@ public class Croptopia implements ModInitializer {
 
         // \bregisterItem\b..[A-Z]\w+",
         //System.out.println( "\"" + itemName + "\",");
+        if (item instanceof SeedItem) {
+            seeds.add(new ConfigurableSeed(itemName, item, ((SeedItem) item).getCategory()));
+        }
 
         // data generation
         //runner.getTagger().addTag(item, Croptopia.createIdentifier(itemName));
@@ -209,11 +231,11 @@ public class Croptopia implements ModInitializer {
     }
 
     private void modifyChickenBreeds() {
-        ItemStack[] stacks = ChickenAccess.getBreedingIngredients().getMatchingStacksClient();
+        IntList stacks = ChickenAccess.getBreedingIngredients().getMatchingItemIds();
         List<Item> baseItems = new ArrayList<>();
 
-        for (ItemStack stack : stacks) {
-            baseItems.add(stack.getItem());
+        for (Integer stack : stacks) {
+            baseItems.add(Item.byRawId(stack));
         }
         baseItems.addAll(seeds.stream().map(ConfigurableSeed::getSeedItem).collect(Collectors.toList()));
         ChickenAccess.setBreedingIngredients(Ingredient.ofItems(baseItems.toArray(new Item[0])));
@@ -224,5 +246,12 @@ public class Croptopia implements ModInitializer {
         Set<Item> newItems = Sets.newHashSet(baseItems);
         newItems.addAll(seeds.stream().map(ConfigurableSeed::getSeedItem).collect(Collectors.toList()));
         ParrotAccess.setTamingIngredients(newItems);
+    }
+
+    private void modifyVillagerFarmerTaskCompostables() {
+        List<Item> baseItems = FarmerWorkTaskAccessor.getCompostables();
+        List<Item> newItems = Lists.newArrayList(baseItems);
+        newItems.addAll(seeds.stream().map(ConfigurableSeed::getSeedItem).collect(Collectors.toList()));
+        FarmerWorkTaskAccessor.setCompostables(newItems);
     }
 }

@@ -9,6 +9,7 @@ import net.minecraft.block.ShapeContext;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemConvertible;
+import net.minecraft.tag.BlockTags;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
@@ -51,7 +52,7 @@ public class CroptopiaCropBlock extends CropBlock {
         Biome.Category biomeCat = world.getBiome(pos).getCategory();
         if (world.getChunk(pos).getStatus().getIndex() < ChunkStatus.FULL.getIndex()) {
             // ON WORLD GENERATION
-            if (biomeCat.equals(seed.getCategory())) {
+            if (seed.getCategory().contains(biomeCat)) {
                 return super.canPlaceAt(state, world, pos);
             }
         } else if (world.getChunk(pos).getStatus().getIndex() == ChunkStatus.FULL.getIndex()) {
@@ -62,7 +63,7 @@ public class CroptopiaCropBlock extends CropBlock {
     }
 
     protected boolean canPlantOnTop(BlockState floor, BlockView world, BlockPos pos) {
-        return floor.isOf(Blocks.GRASS_BLOCK) || floor.isOf(Blocks.FARMLAND) || floor.isOf(Blocks.SAND) || floor.isOf(Blocks.RED_SAND);
+        return (super.canPlantOnTop(floor, world, pos) || floor.isIn(BlockTags.DIRT) || floor.isIn(BlockTags.SAND)) && !floor.isOf(Blocks.DIRT);
     }
 
     @Override
@@ -70,7 +71,7 @@ public class CroptopiaCropBlock extends CropBlock {
         if (getAge(state) == getMaxAge()) {
             world.setBlockState(pos, this.withAge(0), 2);
             dropStacks(state, world, pos);
-            return ActionResult.CONSUME;
+            return ActionResult.SUCCESS;
         }
         return ActionResult.PASS;
     }

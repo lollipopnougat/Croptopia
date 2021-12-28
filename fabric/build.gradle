@@ -1,7 +1,7 @@
 import net.fabricmc.loom.task.RemapJarTask
 
 plugins {
-    id 'fabric-loom' version '0.8-SNAPSHOT'
+    id 'fabric-loom' version '0.10-SNAPSHOT'
     id 'com.github.johnrengelman.shadow' version '7.0.0'
     id 'maven-publish'
 }
@@ -9,7 +9,14 @@ plugins {
 repositories {
     mavenCentral()
     maven {
+        url = "https://repo.stellardrift.ca/repository/snapshots/"
+        name = "stellardriftSnapshots"
+    }
+    maven {
         url = 'https://maven.blamejared.com'
+    }
+    maven {
+        url = "https://maven.terraformersmc.com/"
     }
 }
 
@@ -28,7 +35,9 @@ dependencies {
     modImplementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_version}"
     modImplementation "vazkii.patchouli:Patchouli:1.17-55-FABRIC-SNAPSHOT"
 
-    modImplementation "io.github.prospector:modmenu:${rootProject.modmenu_version}",{
+    modImplementation(include("ca.stellardrift:confabricate:2.2.0-SNAPSHOT"))
+
+    modImplementation "com.terraformersmc:modmenu:${rootProject.modmenu_version}",{
         exclude(group: "net.fabricmc.fabric-api")
     }
 
